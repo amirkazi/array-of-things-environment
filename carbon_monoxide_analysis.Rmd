@@ -1,0 +1,91 @@
+---
+title: "CDOT_CO_TRAFFIC_analysis"
+author: "Amir Kazi"
+date: "11/30/2018"
+output: html_document
+---
+
+```{r}
+
+library (pacman)
+library(tidyverse)
+p_load (lubridate, sp, rgdal, rgeos, raster, gstat, tmap, leaflet)
+
+```
+
+```{r}
+# READING FILES FROM AOT 
+nodes <- read.csv ('nodes.csv')
+sensor.info <- read.csv ('sensors.csv')
+sensor.data <- read.csv ('data.csv.gz')
+```
+
+```{r}
+
+# FILTERING FOR CARBON MONOXIDE DATA
+co.data <- sensor.data %>% 
+  filter (sensor == 'co')
+
+# CLEANING
+co.data$timestamp2 <- ymd_hms (co.data$timestamp)
+co.data$value_raw <- as.numeric(co.data$value_raw)
+co.data$value_hrf <- as.numeric(co.data$value_hrf)
+
+co.data <-
+  co.data %>%
+  mutate(hour = hour(timestamp2))
+
+co.data <- 
+  mutate (co.data, status = "non_peak")
+co.data$status[co.data$hour>=6 & co.data$hour<10] <- "peak"
+co.data$status[co.data$hour>=15 & co.data$hour<19] <- "peak"
+```
+
+```{r}
+# OVERALL CO DISTRIBUTION
+
+overall <- co.data %>%
+  group_by(hour) %>%
+  summarise (avg_co = mean(value_hrf, na.rm= TRUE))
+
+overall <- mutate (overall, status = "non_peak")
+overall$status[overall$hour>=6 & overall$hour<10] <- "peak"
+overall$status[overall$hour>=15 & overall$hour<19] <- "peak"
+  
+ggplot (overall, mapping = aes(x = hour, y = avg_co, fill = status)) +
+  geom_col()  +
+  labs (title = "Overall mean distribution of CO across Chicago in a day", 
+        x = "HOUR", y = "Carbon Monoxide Levels") 
+
+```
+
+
+
+```{r}
+# CO LEVELS BY LOCATION
+overall.co <- co.data %>%
+  group_by (node_id) %>%
+  summarize (avg_co = mean (value_hrf, na.rm = TRUE))
+
+nodes.co <- merge (overall.co, nodes, by = c('node_id'))
+coordinates (nodes.co) <- nodes.co[,c('lon', 'lat')]
+proj4string(nodes.co) <- CRS ("+init=epsg:4326")
+
+tmap_mode ("view")
+tm_shape(nodes.co) + tm_dots()
+nodes.co$avgCO <- as.numeric (nodes.co$avg_co)
+tm_shape(nodes.co) + tm_dots (col = "avg_co", size = 0.1, title = "CO levels by node location")
+
+```
+
+
+
+```{r}
+chiCA <- readOGR (".", "ChiComArea")
+tmap_mode("view")
+tm_shape(chiCA) + tm_borders() +
+  tm_shape (nodes.co) + tm_dots (col = "avg_co", size = 0.1, title = "Average CO levels in Chicago")
+```
+
+
+
