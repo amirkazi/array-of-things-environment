@@ -6,3 +6,6 @@ Code in this repository primarily does the following tasks:
 - Plots distribution of different environmental features (e.g. Carbon Monoxide) over time.
 - Plots distribution of environmental features across locations/nodes.
 
+
+
+Current Analysis involves October, November and December 2018 data.
