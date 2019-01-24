@@ -1,0 +1,258 @@
+---
+title: "Ozone & NO2 Analysis for CDOT"
+author: "Amir Kazi"
+date: "1/24/2019"
+output:
+  html_document: 
+    code_folding: hide
+---
+
+```{r setup, message=FALSE}
+library (pacman)
+library(tidyverse)
+p_load (lubridate, sp, rgdal, rgeos, raster, gstat, tmap, leaflet,scales)
+library (here)
+```
+
+```{r, message=FALSE}
+# READING FILES FROM AOT 
+nodes <- read.csv (here("data", "nodes.csv"))
+sensor.info <- read.csv (here("data", "sensors.csv"))
+
+# July, August, September do not have values for value_hrf, hence discarded.
+
+# CREATING DATA FRAMES
+october.data <- read.csv (here("data", "october_data.csv"))
+november.data <- read.csv (here("data", "november_data.csv"))
+december.data <- read.csv (here("data", "december_data.csv"))
+
+merged.data <- do.call("rbind", list(october.data, november.data, december.data))
+
+```
+
+
+```{r, message=FALSE}
+# FORMATTING TIME FROM UTC 
+#merged.data$timestamp <- as.POSIXct(merged.data$timestamp, tz="America/Chicago")
+
+merged.data$timestamp <- with_tz(ymd_hms (merged.data$timestamp), "America/Chicago")
+
+# FORMATTING VALUES AS NUMERIC
+#merged.data$value_hrf <- as.numeric(merged.data$value_hrf)
+```
+
+
+
+```{r, message=FALSE}
+# SETTING PEAK AND NON-PEAK TIMES
+merged.data <-mutate (merged.data, status = "non_peak")
+merged.data$status[hour(merged.data$timestamp)>=6 & hour(merged.data$timestamp)<10] <- "peak"
+merged.data$status[hour(merged.data$timestamp)>=15 & hour(merged.data$timestamp)<19] <- "peak"
+
+# CREATING MONTH AND HOUR COLUMNS
+merged.data$month <- month (merged.data$timestamp, label = TRUE)
+merged.data$hour <- hour (merged.data$timestamp)
+
+# REMOVING SEPTEMBER
+merged.data <- merged.data %>% filter(month != "Sep")
+```
+
+
+
+```{r}
+# NO2 VALUE_HRF 
+NO2_aggergate <-
+  merged.data %>%
+  filter (sensor == "no2") %>%
+  group_by(month, hour)  %>%
+  summarise (avg_NO2 = mean(value_hrf, na.rm= TRUE))
+  
+
+NO2_aggergate <-mutate (NO2_aggergate, status = "non_peak")
+NO2_aggergate$status[NO2_aggergate$hour>=6 & NO2_aggergate$hour<10] <- "peak"
+NO2_aggergate$status[NO2_aggergate$hour>=15 & NO2_aggergate$hour<19] <- "peak"
+
+
+NO2_aggergate %>%
+  ggplot(aes( x = hour, y = avg_NO2)) +
+  geom_col(aes(fill = status)) +
+  facet_grid(. ~ month) + 
+  labs(title ="Average Nitrogen Dioxide in Chicago As Measured by Array of Things", 
+       subtitle = "Large variations in NO2 values",
+       x = "Hour of Day (CST)", y = "Average NO2 (HRF)",
+       caption = "AoT Data: October - December 2019")  +
+  theme_bw()  + 
+  theme(plot.title = element_text(hjust = -0, size = 11, face = "bold"), 
+        plot.subtitle = element_text(size = 9, face = "bold"), 
+        legend.title=element_blank())
+
+```
+```{r}
+
+# NO2 VALUE_RAW
+NO2_aggergate_raw <-
+  merged.data %>%
+  filter (sensor == "no2") %>%
+  group_by(month, hour)  %>%
+  summarise (avg_NO2 = mean(value_raw, na.rm= TRUE))
+  
+
+NO2_aggergate_raw <-mutate (NO2_aggergate_raw, status = "non_peak")
+NO2_aggergate_raw$status[NO2_aggergate_raw$hour>=6 & NO2_aggergate_raw$hour<10] <- "peak"
+NO2_aggergate_raw$status[NO2_aggergate_raw$hour>=15 & NO2_aggergate_raw$hour<19] <- "peak"
+
+
+NO2_aggergate_raw %>%
+  ggplot(aes( x = hour, y = avg_NO2)) +
+  geom_col(aes(fill = status)) +
+  facet_grid(. ~ month) + 
+  labs(title ="Average Nitrogen Dioxide in Chicago As Measured by Array of Things", 
+       subtitle = "Large variations in NO2 values",
+       x = "Hour of Day (CST)", y = "Average NO2 (RAW)",
+       caption = "AoT Data: October - December 2019")  +
+  theme_bw()  + 
+  theme(plot.title = element_text(hjust = -0, size = 11, face = "bold"), 
+        plot.subtitle = element_text(size = 9, face = "bold"), 
+        legend.title=element_blank())
+```
+
+
+
+
+```{r}
+# o3 VALUE_HRF 
+O3_aggergate <-
+  merged.data %>%
+  filter (sensor == "o3") %>%
+  group_by(month, hour)  %>%
+  summarise (avg_03 = mean(value_hrf, na.rm= TRUE))
+  
+
+O3_aggergate <-mutate (O3_aggergate, status = "non_peak")
+O3_aggergate$status[O3_aggergate$hour>=6 & O3_aggergate$hour<10] <- "peak"
+O3_aggergate$status[O3_aggergate$hour>=15 & O3_aggergate$hour<19] <- "peak"
+
+
+O3_aggergate %>%
+  ggplot(aes( x = hour, y = avg_03)) +
+  geom_col(aes(fill = status)) +
+  facet_grid(. ~ month) + 
+  labs(title ="Average Ozone in Chicago As Measured by Array of Things", 
+       subtitle = "Ozone values seem more consistent than NO2 values",
+       x = "Hour of Day (CST)", y = "Average Ozone (HRF)",
+       caption = "AoT Data: October - December 2019")  +
+  theme_bw()  + 
+  theme(plot.title = element_text(hjust = -0, size = 11, face = "bold"), 
+        plot.subtitle = element_text(size = 9, face = "bold"), 
+        legend.title=element_blank())
+
+```
+```{r}
+# o3 VALUE_RAW 
+O3_aggergate_raw <-
+  merged.data %>%
+  filter (sensor == "o3") %>%
+  group_by(month, hour)  %>%
+  summarise (avg_03 = mean(value_raw, na.rm= TRUE))
+  
+
+O3_aggergate_raw <-mutate (O3_aggergate_raw, status = "non_peak")
+O3_aggergate_raw$status[O3_aggergate_raw$hour>=6 & O3_aggergate_raw$hour<10] <- "peak"
+O3_aggergate_raw$status[O3_aggergate_raw$hour>=15 & O3_aggergate_raw$hour<19] <- "peak"
+
+
+O3_aggergate_raw %>%
+  ggplot(aes( x = hour, y = avg_03)) +
+  geom_col(aes(fill = status)) +
+  facet_grid(. ~ month) + 
+  labs(title ="Average Ozone in Chicago As Measured by Array of Things", 
+       subtitle = "Ozone values seem more consistent than NO2 values",
+       x = "Hour of Day (CST)", y = "Average Ozone (RAW)",
+       caption = "AoT Data: October - December 2019")  +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = -0, size = 11, face = "bold"), 
+        plot.subtitle = element_text(size = 9, face = "bold"), 
+        legend.title=element_blank()) 
+
+
+```
+
+***
+
+<br><br><br>
+
+### PLOTTING LOCATION EFFECTS
+
+
+
+```{r, message=FALSE}
+nodes.spt <- SpatialPointsDataFrame(nodes[,c('lon','lat')],nodes)
+proj4string(nodes.spt) <- CRS("+init=epsg:4326")
+```
+
+```{r, message=FALSE}
+#tmap_mode('plot')
+#tm_shape(nodes.spt) + tm_dots("description",style="cat",size=0.3)
+tmap_mode('view')
+#tm_shape(nodes.spt) + tm_dots("description",style="cat",size=0.1)
+```
+
+```{r, message=FALSE, warning= FALSE}
+chiCA <- readOGR(dsn=path.expand("~/Desktop/array-of-things-environment/ChiComArea.shp"))
+```
+
+
+<br><br>
+
+### Locations of AOT Nodes in the Chicago Area
+```{r, message=FALSE, warning= FALSE}
+tm_shape(chiCA) + tm_borders(alpha = 0.7) + tm_shape(nodes.spt) + tm_dots("description",title="AoT Node Locations", style="cat",size=0.1) 
+```
+
+
+<br><br>
+
+### NO2 Levels by Location
+
+```{r, message=FALSE, warning= FALSE}
+N02_locations <- merged.data %>% 
+  filter (sensor == "no2") %>%
+  group_by(node_id) %>%
+  summarize(Average_NO2 = mean(value_hrf,na.rm= TRUE))
+
+N02_node.temps <- merge(N02_locations, nodes, by = c("node_id"))
+
+coordinates(N02_node.temps) <- N02_node.temps[,c("lon", "lat")]
+proj4string(N02_node.temps) <- CRS("+init=epsg:4326")
+
+tmap_mode("view")
+tm_shape(chiCA) + tm_borders() + 
+  tm_shape(N02_node.temps) + 
+  tm_dots(col="Average_NO2",size=0.2,title="average NO2 (ppm)", 
+          colorNA = 'black', legend.col.reverse = TRUE) 
+
+```
+
+<br><br>
+
+
+### Ozone Levels by Location
+
+```{r, message=FALSE, warning= FALSE}
+O3_locations <- merged.data %>% 
+  filter (sensor == "o3") %>%
+  group_by(node_id) %>%
+  summarize(Average_O3 = mean(value_hrf,na.rm= TRUE))
+
+O3_node.temps <- merge(O3_locations, nodes, by = c("node_id"))
+
+coordinates(O3_node.temps) <- O3_node.temps[,c("lon", "lat")]
+proj4string(O3_node.temps) <- CRS("+init=epsg:4326")
+
+tmap_mode("view")
+tm_shape(chiCA) + tm_borders() + 
+  tm_shape(O3_node.temps) + 
+  tm_dots(col="Average_O3",size=0.2,title="Average O3 (ppm)", 
+          colorNA = 'black', legend.col.reverse = TRUE) 
+
+```

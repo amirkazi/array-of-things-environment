@@ -1,0 +1,18 @@
+
+
+# FILTERING DATA
+awk -F, '$4 ~ /o3|no2|sensor/ {print}' JULY.csv > july_data.csv
+awk -F, '$4 ~ /o3|no2|sensor/ {print}' SEPTEMBER.csv > september_data.csv
+
+
+awk -F, '$4 ~ /o3|no2|sensor/ {print}' OCTOBER.csv > october_data.csv
+awk -F, '$4 ~ /o3|no2|sensor/ {print}' NOVEMBER.csv > november_data.csv
+awk -F, '$4 ~ /o3|no2|sensor/ {print}' DECEMBER.csv > december_data.csv
+
+
+# READING HEADERS & TOP COLUMNS
+head -n 1 july_data.csv
+head -n 10 december_data.csv
+head -n 10 november_data.csv
+
+head -n 10 october_data.csv
